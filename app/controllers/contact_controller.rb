@@ -1,5 +1,5 @@
 class ContactController < ApplicationController
-  CREATE_OR_UPDATE_CONTACT_PARAMS = %i[email phone_number]
+  CREATE_OR_UPDATE_CONTACT_PARAMS = %i[email phoneNumber]
 
   def create_or_update_contact
     params.permit(CREATE_OR_UPDATE_CONTACT_PARAMS)

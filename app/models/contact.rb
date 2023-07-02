@@ -4,36 +4,53 @@ class Contact < ApplicationRecord
 
   def self.create_or_update_contact(params)
     email = params[:email]
-    phone_number = params[:phone_number]
+    phone_number = params[:phoneNumber]
 
-    contacts = fetch_contacts(email, phone_number)
-    
+    check_and_create_contact(email, phone_number)
+    check_and_create_contact_linkages(fetch_contacts(email, phone_number))
 
-    contacts = if contacts.empty?
-                 contact = Contact.create(
-                   email: email,
-                   phone_number: phone_number,
-                   link_precedence: PRIMARY_CONTACT
-                 )
-                 [contact]
-               else
-                 check_and_create_linkage(contacts).to_a
-               end
-
-    generate_response(contacts)
+    generate_response(fetch_contacts(email, phone_number))
   end
 
-  def self.fetch_contacts(email, phone_number)
+  def self.check_and_create_contact(email, phone_number)
     if email.present? && phone_number.present?
-      Contact.where(email: email, phone_number: phone_number).order('id')
+      link_precedence = fetch_contacts(email, phone_number).present? ? SECONDARY_CONTACT : PRIMARY_CONTACT
+      contact = Contact.find_by(email: email, phone_number: phone_number)
+      if contact.nil?
+        Contact.create(
+          email: email,
+          phone_number: phone_number,
+          link_precedence: link_precedence
+        )
+      else
+        contact.update(link_precedence: link_precedence)
+      end
     elsif email.present?
-      Contact.where(email: email).order('id')
+      if Contact.find_by(email: email).nil?
+        Contact.create(
+          email: email,
+          link_precedence: PRIMARY_CONTACT
+        )
+      end
     elsif phone_number.present?
-      Contact.where(phone_number: phone_number).order('id')
+      if Contact.find_by(phone_number: phone_number).nil?
+      Contact.create(
+        phone_number: phone_number,
+        link_precedence: PRIMARY_CONTACT
+      )
+      end
     end
   end
 
-  def self.check_and_create_linkage(contacts)
+  def self.fetch_contacts(email, phone_number)
+    conditions = []
+    conditions << "email = '#{email}'" if email.present?
+    conditions << "phone_number = '#{phone_number}'" if phone_number.present?
+    conditions = conditions.join(' OR ')
+    Contact.where(conditions)
+  end
+
+  def self.check_and_create_contact_linkages(contacts)
     return contacts if contacts.where(link_precedence: PRIMARY_CONTACT).count == 1
     first_contact = contacts.first
     contacts.where(id: contacts.ids - [first_contact.id])
@@ -55,10 +72,10 @@ class Contact < ApplicationRecord
 
     {
       "contact": {
-        "primary_contact_id": primary_contact_id,
+        "primaryContactId": primary_contact_id,
         "emails": emails.uniq,
-        "phone_numbers": phone_numbers.uniq,
-        "secondary_contact_ids": secondary_contact_ids.uniq
+        "phoneNumbers": phone_numbers.uniq,
+        "secondaryContactIds": secondary_contact_ids.uniq
       }
     }
   end
