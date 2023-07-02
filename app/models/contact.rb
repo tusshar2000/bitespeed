@@ -14,13 +14,14 @@ class Contact < ApplicationRecord
 
   def self.check_and_create_contact(email, phone_number)
     if email.present? && phone_number.present?
-      link_precedence = fetch_contacts(email, phone_number).present? ? SECONDARY_CONTACT : PRIMARY_CONTACT
+      contacts = fetch_contacts(email, phone_number)
       contact = Contact.find_by(email: email, phone_number: phone_number)
       if contact.nil?
         Contact.create(
           email: email,
           phone_number: phone_number,
-          link_precedence: link_precedence
+          linked_id: contacts.present? ? contacts.first.id : nil,
+          link_precedence: contacts.present? ? SECONDARY_CONTACT : PRIMARY_CONTACT
         )
       else
         contact.update(link_precedence: link_precedence)
