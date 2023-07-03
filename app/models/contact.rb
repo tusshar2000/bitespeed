@@ -36,10 +36,28 @@ class Contact < ApplicationRecord
 
   def self.fetch_contacts(email, phone_number)
     conditions = []
-    conditions << "email = '#{email}'" if email.present?
-    conditions << "phone_number = '#{phone_number}'" if phone_number.present?
-    conditions = conditions.join(' OR ')
-    Contact.where(conditions).order('id')
+    email_list = [email].compact
+    phone_number_list = [phone_number].compact
+    new_email_list = []
+    new_phone_number_list = []
+    contacts = nil
+
+    while true
+      contacts = if email_list.present? && phone_number_list.present?
+                   Contact.where(email: email_list).or(Contact.where(phone_number: phone_number_list))
+                 elsif email_list.present?
+                   Contact.where(email: email_list)
+                 elsif phone_number_list.present?
+                   Contact.where(phone_number: phone_number_list)
+                 end
+      new_email_list = contacts.pluck(:email).uniq
+      new_phone_number_list = contacts.pluck(:phone_number).uniq
+      break if new_email_list == email_list && new_phone_number_list == phone_number_list
+      email_list = new_email_list
+      phone_number_list = new_phone_number_list
+    end
+
+    contacts
   end
 
   def self.check_and_create_contact_linkages(contacts)
