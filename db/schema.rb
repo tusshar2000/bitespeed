@@ -19,6 +19,8 @@ ActiveRecord::Schema[7.0].define(version: 2023_07_02_150042) do
     t.datetime "deleted_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["email"], name: "index_contacts_on_email"
+    t.index ["phone_number"], name: "index_contacts_on_phone_number"
   end
 
 end
