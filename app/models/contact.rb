@@ -13,33 +13,24 @@ class Contact < ApplicationRecord
   end
 
   def self.check_and_create_contact(email, phone_number)
-    if email.present? && phone_number.present?
-      contacts = fetch_contacts(email, phone_number)
-      contact = Contact.find_by(email: email, phone_number: phone_number)
-      if contact.nil?
-        Contact.create(
-          email: email,
-          phone_number: phone_number,
-          linked_id: contacts.present? ? contacts.first.id : nil,
-          link_precedence: contacts.present? ? SECONDARY_CONTACT : PRIMARY_CONTACT
-        )
-      else
-        contact.update(link_precedence: link_precedence)
-      end
-    elsif email.present?
-      if Contact.find_by(email: email).nil?
-        Contact.create(
-          email: email,
-          link_precedence: PRIMARY_CONTACT
-        )
-      end
-    elsif phone_number.present?
-      if Contact.find_by(phone_number: phone_number).nil?
+    contact_via_email = Contact.where(email: email) if email.present?
+    contact_via_phone_number = Contact.where(phone_number: phone_number) if phone_number.present?
+    if email.present? && phone_number.present? && (contact_via_email.empty? || contact_via_phone_number.empty?)
+      Contact.create(
+        email: email,
+        phone_number: phone_number,
+        link_precedence: PRIMARY_CONTACT
+      )
+    elsif email.present? && contact_via_email.empty?
+      Contact.create(
+        email: email,
+        link_precedence: PRIMARY_CONTACT
+      )
+    elsif phone_number.present? && contact_via_phone_number.empty?
       Contact.create(
         phone_number: phone_number,
         link_precedence: PRIMARY_CONTACT
       )
-      end
     end
   end
 
@@ -48,7 +39,7 @@ class Contact < ApplicationRecord
     conditions << "email = '#{email}'" if email.present?
     conditions << "phone_number = '#{phone_number}'" if phone_number.present?
     conditions = conditions.join(' OR ')
-    Contact.where(conditions)
+    Contact.where(conditions).order('id')
   end
 
   def self.check_and_create_contact_linkages(contacts)
@@ -63,12 +54,24 @@ class Contact < ApplicationRecord
     emails = []
     phone_numbers = []
     secondary_contact_ids = []
+    linked_ids = records.pluck(:linked_id)
 
     records.each do |record|
       primary_contact_id = record.id if record.link_precedence == PRIMARY_CONTACT
       emails << record.email if record.email.present?
       phone_numbers << record.phone_number if record.phone_number.present?
       secondary_contact_ids << record.id if record.link_precedence == SECONDARY_CONTACT
+    end
+
+    while primary_contact_id.nil?
+      new_records = Contact.where(id: linked_ids)
+      new_records.each do |record|
+        primary_contact_id = record.id if record.link_precedence == PRIMARY_CONTACT
+        emails << record.email if record.email.present?
+        phone_numbers << record.phone_number if record.phone_number.present?
+        secondary_contact_ids << record.id if record.link_precedence == SECONDARY_CONTACT
+      end
+      linked_ids = new_records.pluck(:linked_id)
     end
 
     {
